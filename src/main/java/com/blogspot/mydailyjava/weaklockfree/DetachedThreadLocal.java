@@ -52,7 +52,10 @@ public class DetachedThreadLocal<T> implements Runnable {
     }
 
     public void inherit(Thread thread) {
-        map.put(thread, get());
+        T value = get();
+        if (value != null) {
+            map.put(thread, value);
+        }
     }
 
     /**
