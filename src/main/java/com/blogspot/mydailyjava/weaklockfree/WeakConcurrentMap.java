@@ -5,6 +5,7 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * <p>
@@ -15,6 +16,8 @@ import java.util.concurrent.ConcurrentMap;
  * with the map contract.
  */
 public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable {
+
+    private static final AtomicLong ID = new AtomicLong();
 
     final ConcurrentMap<WeakKey<K>, V> target;
 
@@ -27,7 +30,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         target = new ConcurrentHashMap<WeakKey<K>, V>();
         if (cleanerThread) {
             thread = new Thread(this);
-            thread.setName("Reference cleaner thread");
+            thread.setName("weak-ref-cleaner-" + ID.getAndIncrement());
             thread.setPriority(Thread.MIN_PRIORITY);
             thread.setDaemon(true);
             thread.start();
