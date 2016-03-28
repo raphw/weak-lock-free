@@ -1,9 +1,10 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
 /**
+ * <p>
  * A detached local that allows for explicit control of setting and removing values from a thread-local
  * context.
- * <p/>
+ * </p>
  * Instances of this class are non-blocking and fully thread safe.
  */
 public class DetachedThreadLocal<T> implements Runnable {
@@ -16,16 +17,16 @@ public class DetachedThreadLocal<T> implements Runnable {
             case MANUAL:
                 map = new WeakConcurrentMap<Thread, T>(cleaner == Cleaner.THREAD) {
                     @Override
-                    protected T defaultValue() {
-                        return DetachedThreadLocal.this.initialValue();
+                    protected T defaultValue(Thread key) {
+                        return DetachedThreadLocal.this.initialValue(key);
                     }
                 };
                 break;
             case INLINE:
                 map = new WeakConcurrentMap.WithInlinedExpunction<Thread, T>() {
                     @Override
-                    protected T defaultValue() {
-                        return DetachedThreadLocal.this.initialValue();
+                    protected T defaultValue(Thread key) {
+                        return DetachedThreadLocal.this.initialValue(key);
                     }
                 };
                 break;
@@ -55,9 +56,10 @@ public class DetachedThreadLocal<T> implements Runnable {
     }
 
     /**
-     * Defines the initial value for any thread local. If no default is set, the default value is {@code null}.
+     * @param thread The thread for which an initial value is created.
+     * @return The initial value for any thread local. If no default is set, the default value is {@code null}.
      */
-    protected T initialValue() {
+    protected T initialValue(Thread thread) {
         return null;
     }
 

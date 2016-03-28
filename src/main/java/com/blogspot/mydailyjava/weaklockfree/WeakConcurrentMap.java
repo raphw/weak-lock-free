@@ -7,9 +7,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
+ * <p>
  * A thread-safe map with weak keys. Entries are based on a key's system hash code and keys are considered
  * equal only by reference equality.
- * <p/>
+ * </p>
  * This class does not implement the {@link java.util.Map} interface because this implementation is incompatible
  * with the map contract.
  */
@@ -17,9 +18,6 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
     final ConcurrentMap<WeakKey<K>, V> target;
 
-    /**
-     * The cleaner thread or {@code null} if it does not exist.
-     */
     private final Thread thread;
 
     /**
@@ -38,14 +36,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         }
     }
 
-    /**
-     * Returns the value associated with this key or {@code null} if no such value exists.
-     */
     public V get(K key) {
         if (key == null) throw new NullPointerException();
         V value = target.get(new WeakKey<K>(key));
         if (value == null) {
-            value = defaultValue();
+            value = defaultValue(key);
             if (value != null) {
                 put(key, value);
             }
@@ -53,17 +48,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return value;
     }
 
-    /**
-     * Associates the given value with the provided key.
-     */
     public void put(K key, V value) {
         if (key == null || value == null) throw new NullPointerException();
         target.put(new WeakKey<K>(key, this), value);
     }
 
-    /**
-     * Removes the reference for the supplied key.
-     */
     public void remove(K key) {
         if (key == null) throw new NullPointerException();
         target.remove(new WeakKey<K>(key));
@@ -77,9 +66,10 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /**
-     * Can be overridden to provide a default value.
+     * @param key The key for which to create a default value.
+     * @return The default value for a key without value.
      */
-    protected V defaultValue() {
+    protected V defaultValue(K key) {
         return null;
     }
 
