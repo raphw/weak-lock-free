@@ -47,15 +47,35 @@ public class DetachedThreadLocal<T> implements Runnable {
         map.remove(Thread.currentThread());
     }
 
+    /**
+     * Clears all thread local references for all threads.
+     */
     public void clearAll() {
         map.clear();
     }
 
-    public void inherit(Thread thread) {
+    /**
+     * @param thread The thread to which this thread's thread local value should be pushed.
+     * @return The value being set.
+     */
+    public T pushTo(Thread thread) {
         T value = get();
         if (value != null) {
             map.put(thread, value);
         }
+        return value;
+    }
+
+    /**
+     * @param thread The thread from which the thread thread local value should be polled.
+     * @return The value being set.
+     */
+    public T pullFrom(Thread thread) {
+        T value = map.get(thread);
+        if (value != null) {
+            set(value);
+        }
+        return value;
     }
 
     /**
