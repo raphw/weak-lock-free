@@ -4,7 +4,7 @@
 
     <groupId>com.blogspot.mydailyjava</groupId>
     <artifactId>weak-lock-free</artifactId>
-    <version>0.2-SNAPSHOT</version>
+    <version>0.2</version>
 
     <inceptionYear>2016</inceptionYear>
 
@@ -59,7 +59,7 @@
         <connection>scm:git:git@github.com:raphw/weak-lock-free.git</connection>
         <developerConnection>scm:git:git@github.com:raphw/weak-lock-free.git</developerConnection>
         <url>git@github.com:raphw/weak-lock-free.git</url>
-      <tag>HEAD</tag>
+      <tag>weak-lock-free-0.2</tag>
   </scm>
 
     <distributionManagement>
