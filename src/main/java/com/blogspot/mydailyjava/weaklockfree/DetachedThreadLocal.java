@@ -67,10 +67,10 @@ public class DetachedThreadLocal<T> implements Runnable {
     }
 
     /**
-     * @param thread The thread from which the thread thread local value should be polled.
+     * @param thread The thread from which the thread thread local value should be fetched.
      * @return The value being set.
      */
-    public T pullFrom(Thread thread) {
+    public T fetchFrom(Thread thread) {
         T value = map.get(thread);
         if (value != null) {
             set(value);
