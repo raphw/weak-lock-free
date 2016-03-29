@@ -9,3 +9,13 @@ As a wrapper around this `WeakConcurrentMap`, this package also contains a `Deta
 the current thread serves as a key of the map.
 
 This map does not implement the `java.util.Map` interface to simplify the implementation.
+
+The library is hosted on *Maven Central* and *JCenter*:
+
+```xml
+<dependency>
+  <groupId>com.blogspot.mydailyjava</groupId>
+  <artifactId>weak-lock-free</artifactId>
+  <version>0.1</version>
+</dependency>
+```
