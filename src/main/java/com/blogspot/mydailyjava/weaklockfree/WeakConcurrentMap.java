@@ -39,26 +39,50 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         }
     }
 
+    /**
+     * @param key The key of the entry.
+     * @return The value of the entry or the default value if it did not exist.
+     */
     public V get(K key) {
         if (key == null) throw new NullPointerException();
         V value = target.get(new WeakKey<K>(key));
         if (value == null) {
             value = defaultValue(key);
             if (value != null) {
-                put(key, value);
+                V previousValue = target.putIfAbsent(new WeakKey<K>(key, this), value);
+                if (previousValue != null) {
+                    value = previousValue;
+                }
             }
         }
         return value;
     }
 
-    public void put(K key, V value) {
-        if (key == null || value == null) throw new NullPointerException();
-        target.put(new WeakKey<K>(key, this), value);
+    /**
+     * @param key The key of the entry.
+     * @return {@code true} if the key already defines a value.
+     */
+    public boolean containsKey(K key) {
+        return target.containsKey(new WeakKey<K>(key));
     }
 
-    public void remove(K key) {
+    /**
+     * @param key The key of the entry.
+     * @param value The value of the entry.
+     * @return The previous entry or {@code null} if it does not exist.
+     */
+    public V put(K key, V value) {
+        if (key == null || value == null) throw new NullPointerException();
+        return target.put(new WeakKey<K>(key, this), value);
+    }
+
+    /**
+     * @param key The key of the entry.
+     * @return The removed entry or {@code null} if it does not exist.
+     */
+    public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        target.remove(new WeakKey<K>(key));
+        return target.remove(new WeakKey<K>(key));
     }
 
     /**
@@ -69,6 +93,9 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /**
+     * Creates a default value. There is no guarantee that the requested value will be set as a once it is created
+     * in case that another thread requests a value for a key concurrently.
+     *
      * @param key The key for which to create a default value.
      * @return The default value for a key without value.
      */
@@ -165,15 +192,21 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         }
 
         @Override
-        public void put(K key, V value) {
+        public boolean containsKey(K key) {
             expungeStaleEntries();
-            super.put(key, value);
+            return super.containsKey(key);
         }
 
         @Override
-        public void remove(K key) {
+        public V put(K key, V value) {
             expungeStaleEntries();
-            super.remove(key);
+            return super.put(key, value);
+        }
+
+        @Override
+        public V remove(K key) {
+            expungeStaleEntries();
+            return super.remove(key);
         }
 
         void expungeStaleEntries() {

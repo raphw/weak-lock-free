@@ -70,7 +70,7 @@ public class WeakConcurrentMapTest {
             assertThat(map.get(key3), is(value3));
             assertThat(map.get(key4), is(value4));
             assertThat(map.target.size(), is(2));
-            map.remove(key3);
+            assertThat(map.remove(key3), is(value3));
             assertThat(map.get(key3), nullValue());
             assertThat(map.get(key4), is(value4));
             assertThat(map.target.size(), is(1));
