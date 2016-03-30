@@ -61,7 +61,7 @@ public class DetachedThreadLocal<T> implements Runnable {
     public T pushTo(Thread thread) {
         T value = get();
         if (value != null) {
-            map.put(thread, value);
+            map.put(thread, inheritValue(value));
         }
         return value;
     }
@@ -73,7 +73,7 @@ public class DetachedThreadLocal<T> implements Runnable {
     public T fetchFrom(Thread thread) {
         T value = map.get(thread);
         if (value != null) {
-            set(value);
+            set(inheritValue(value));
         }
         return value;
     }
@@ -84,6 +84,14 @@ public class DetachedThreadLocal<T> implements Runnable {
      */
     protected T initialValue(Thread thread) {
         return null;
+    }
+
+    /**
+     * @param value The value that is inherited.
+     * @return The inherited value.
+     */
+    protected T inheritValue(T value) {
+        return value;
     }
 
     /**
