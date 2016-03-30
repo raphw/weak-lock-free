@@ -5,8 +5,7 @@ Such a hash map removes entries containing collected keys by either:
 2. Implicit concurrent removal (entries that contain collected keys are removed by an external thread).
 3. Explicit concurrent removal (explicit interaction with the map's reference queue).
 
-As a wrapper around this `WeakConcurrentMap`, this package also contains a `DetachedThreadLocal` which describes a weak concurrent map where
-the current thread serves as a key of the map.
+As a wrapper around this `WeakConcurrentMap`, this package also contains a `DetachedThreadLocal` which describes a weak concurrent map where the current thread serves as a key of the map. Also, this package delivers a `WeakConcurrentSet` as a wrapper around a weak concurrent map.
 
 This map does not implement the `java.util.Map` interface to simplify the implementation.
 
