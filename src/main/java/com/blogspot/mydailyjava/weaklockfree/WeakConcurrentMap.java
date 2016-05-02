@@ -3,6 +3,8 @@ package com.blogspot.mydailyjava.weaklockfree;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -122,35 +124,35 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /*
-     * Why this works:
-     * ---------------
-     *
-     * Note that this map only supports reference equality for keys and uses system hash codes. Also, for the
-     * WeakKey instances to function correctly, we are voluntarily breaking the Java API contract for
-     * hashCode/equals of these instances.
-     *
-     *
-     * System hash codes are immutable and can therefore be computed prematurely and are stored explicitly
-     * within the WeakKey instances. This way, we always know the correct hash code of a key and always
-     * end up in the correct bucket of our target map. This remains true even after the weakly referenced
-     * key is collected.
-     *
-     * If we are looking up the value of the current key via WeakConcurrentMap::get or any other public
-     * API method, we know that any value associated with this key must still be in the map as the mere
-     * existence of this key makes it ineligible for garbage collection. Therefore, looking up a value
-     * using another WeakKey wrapper guarantees a correct result.
-     *
-     * If we are looking up the map entry of a WeakKey after polling it from the reference queue, we know
-     * that the actual key was already collected and calling WeakKey::get returns null for both the polled
-     * instance and the instance within the map. Since we explicitly stored the identity hash code for the
-     * referenced value, it is however trivial to identify the correct bucket. From this bucket, the first
-     * weak key with a null reference is removed. Due to hash collision, we do not know if this entry
-     * represents the weak key. However, we do know that the reference queue polls at least as many weak
-     * keys as there are stale map entries within the target map. If no key is ever removed from the map
-     * explicitly, the reference queue eventually polls exactly as many weak keys as there are stale entries.
-     *
-     * Therefore, we can guarantee that there is no memory leak.
-     */
+         * Why this works:
+         * ---------------
+         *
+         * Note that this map only supports reference equality for keys and uses system hash codes. Also, for the
+         * WeakKey instances to function correctly, we are voluntarily breaking the Java API contract for
+         * hashCode/equals of these instances.
+         *
+         *
+         * System hash codes are immutable and can therefore be computed prematurely and are stored explicitly
+         * within the WeakKey instances. This way, we always know the correct hash code of a key and always
+         * end up in the correct bucket of our target map. This remains true even after the weakly referenced
+         * key is collected.
+         *
+         * If we are looking up the value of the current key via WeakConcurrentMap::get or any other public
+         * API method, we know that any value associated with this key must still be in the map as the mere
+         * existence of this key makes it ineligible for garbage collection. Therefore, looking up a value
+         * using another WeakKey wrapper guarantees a correct result.
+         *
+         * If we are looking up the map entry of a WeakKey after polling it from the reference queue, we know
+         * that the actual key was already collected and calling WeakKey::get returns null for both the polled
+         * instance and the instance within the map. Since we explicitly stored the identity hash code for the
+         * referenced value, it is however trivial to identify the correct bucket. From this bucket, the first
+         * weak key with a null reference is removed. Due to hash collision, we do not know if this entry
+         * represents the weak key. However, we do know that the reference queue polls at least as many weak
+         * keys as there are stale map entries within the target map. If no key is ever removed from the map
+         * explicitly, the reference queue eventually polls exactly as many weak keys as there are stale entries.
+         *
+         * Therefore, we can guarantee that there is no memory leak.
+         */
     private static class WeakKey<T> extends WeakReference<T> {
 
         private final int hashCode;

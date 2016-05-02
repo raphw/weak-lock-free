@@ -1,5 +1,7 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
+import java.lang.ref.ReferenceQueue;
+
 public class WeakConcurrentSet<V> implements Runnable {
 
     final WeakConcurrentMap<V, Boolean> target;
@@ -18,18 +20,33 @@ public class WeakConcurrentSet<V> implements Runnable {
         }
     }
 
-    public void add(V value) {
-        target.put(value, Boolean.TRUE);
+    /**
+     * @param value The value to add to the set.
+     * @return {@code true} if the value was added to the set and was not contained before.
+     */
+    public boolean add(V value) {
+        return target.put(value, Boolean.TRUE) == null; // is null or Boolean.TRUE
     }
 
+    /**
+     * @param value The value to check if it is contained in the set.
+     * @return {@code true} if the set contains the value.
+     */
     public boolean contains(V value) {
         return target.containsKey(value);
     }
 
+    /**
+     * @param value The value to remove from the set.
+     * @return {@code true} if the value is contained in the set.
+     */
     public boolean remove(V value) {
         return target.remove(value);
     }
 
+    /**
+     * Clears the set.
+     */
     public void clear() {
         target.clear();
     }
@@ -47,6 +64,13 @@ public class WeakConcurrentSet<V> implements Runnable {
      */
     public enum Cleaner {
         THREAD, INLINE, MANUAL
+    }
+
+    /**
+     * @return The reference queue that backs the weak data structure.
+     */
+    public ReferenceQueue<V> getReferenceQueue() {
+        return target;
     }
 
     /**
