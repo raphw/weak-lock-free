@@ -112,6 +112,16 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return thread;
     }
 
+    /**
+     * Cleans all unused references.
+     */
+    public void expungeStaleEntries() {
+        Reference<?> reference;
+        while ((reference = poll()) != null) {
+            target.remove(reference);
+        }
+    }
+
     @Override
     public void run() {
         try {
@@ -209,13 +219,6 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         public V remove(K key) {
             expungeStaleEntries();
             return super.remove(key);
-        }
-
-        void expungeStaleEntries() {
-            Reference<?> reference;
-            while ((reference = poll()) != null) {
-                target.remove(reference);
-            }
         }
     }
 }

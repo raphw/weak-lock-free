@@ -65,12 +65,11 @@ public class WeakConcurrentSet<V> implements Runnable {
     public enum Cleaner {
         THREAD, INLINE, MANUAL
     }
-
     /**
-     * @return The reference queue that backs the weak data structure.
+     * Cleans all unused references.
      */
-    public ReferenceQueue<V> getReferenceQueue() {
-        return target;
+    public void expungeStaleEntries() {
+        target.expungeStaleEntries();
     }
 
     /**
