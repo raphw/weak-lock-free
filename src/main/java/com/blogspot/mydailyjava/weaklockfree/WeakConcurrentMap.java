@@ -3,6 +3,7 @@ package com.blogspot.mydailyjava.weaklockfree;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -13,9 +14,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * equal only by reference equality.
  * </p>
  * This class does not implement the {@link java.util.Map} interface because this implementation is incompatible
- * with the map contract.
+ * with the map contract. While iterating over a map's entries, any key that has not passed iteration is referenced non-weakly.
  */
-public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable {
+public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable, Iterable<Map.Entry<K, V>> {
 
     private static final AtomicLong ID = new AtomicLong();
 
@@ -130,6 +131,18 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         } catch (InterruptedException ignored) {
             clear();
         }
+    }
+
+    @Override
+    public Iterator<Map.Entry<K, V>> iterator() {
+        List<SimpleEntry> entries = new ArrayList<SimpleEntry>();
+        for (WeakKey<K> weakKey : target.keySet()) {
+            K key = weakKey.get();
+            if (key != null) {
+                entries.add(new SimpleEntry(key, weakKey));
+            }
+        }
+        return new EntryIterator(entries);
     }
 
     /*
@@ -250,6 +263,61 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         public V remove(K key) {
             expungeStaleEntries();
             return super.remove(key);
+        }
+    }
+
+    private class EntryIterator implements Iterator<Map.Entry<K, V>> {
+
+        private final List<SimpleEntry> entries;
+
+        private EntryIterator(List<SimpleEntry> entries) {
+            this.entries = entries;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return !entries.isEmpty();
+        }
+
+        @Override
+        public Map.Entry<K, V> next() {
+            if (entries.isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return entries.remove(0);
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private class SimpleEntry implements Map.Entry<K, V> {
+
+        private final K key;
+
+        final WeakKey<K> weakKey;
+
+        private SimpleEntry(K key, WeakKey<K> weakKey) {
+            this.key = key;
+            this.weakKey = weakKey;
+        }
+
+        @Override
+        public K getKey() {
+            return key;
+        }
+
+        @Override
+        public V getValue() {
+            return get(key);
+        }
+
+        @Override
+        public V setValue(V value) {
+            if (value == null) throw new NullPointerException();
+            return target.put(weakKey, value);
         }
     }
 }

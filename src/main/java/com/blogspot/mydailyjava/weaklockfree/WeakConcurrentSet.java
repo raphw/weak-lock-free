@@ -1,8 +1,16 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
-import java.lang.ref.ReferenceQueue;
+import java.util.Iterator;
+import java.util.Map;
 
-public class WeakConcurrentSet<V> implements Runnable {
+/**
+ * <p>
+ * A thread-safe set with weak values. Entries are based on a key's system hash code and keys are considered equal only by reference equality.
+ * </p>
+ * This class does not implement the {@link java.util.Set} interface because this implementation is incompatible
+ * with the set contract. While iterating over a set's entries, any value that has not passed iteration is referenced non-weakly.
+ */
+public class WeakConcurrentSet<V> implements Runnable, Iterable<V> {
 
     final WeakConcurrentMap<V, Boolean> target;
 
@@ -65,6 +73,7 @@ public class WeakConcurrentSet<V> implements Runnable {
     public enum Cleaner {
         THREAD, INLINE, MANUAL
     }
+
     /**
      * Cleans all unused references.
      */
@@ -77,5 +86,34 @@ public class WeakConcurrentSet<V> implements Runnable {
      */
     public Thread getCleanerThread() {
         return target.getCleanerThread();
+    }
+
+    @Override
+    public Iterator<V> iterator() {
+        return new ReducingIterator<V>(target.iterator());
+    }
+
+    private static class ReducingIterator<V> implements Iterator<V> {
+
+        private final Iterator<Map.Entry<V, Boolean>> iterator;
+
+        private ReducingIterator(Iterator<Map.Entry<V, Boolean>> iterator) {
+            this.iterator = iterator;
+        }
+
+        @Override
+        public void remove() {
+            iterator.remove();
+        }
+
+        @Override
+        public V next() {
+            return iterator.next().getKey();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return iterator.hasNext();
+        }
     }
 }

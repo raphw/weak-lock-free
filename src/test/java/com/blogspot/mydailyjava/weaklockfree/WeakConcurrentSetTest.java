@@ -2,6 +2,10 @@ package com.blogspot.mydailyjava.weaklockfree;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -59,6 +63,11 @@ public class WeakConcurrentSetTest {
             assertThat(set.contains(value2), is(true));
             assertThat(set.contains(value3), is(true));
             assertThat(set.contains(value4), is(true));
+            Set<Object> values = new HashSet<Object>(Arrays.asList(value1, value2, value3, value4));
+            for (Object value : set) {
+                assertThat(values.remove(value), is(true));
+            }
+            assertThat(values.isEmpty(), is(true));
             value1 = value2 = null; // Make eligible for GC
             System.gc();
             Thread.sleep(200L);
@@ -74,10 +83,10 @@ public class WeakConcurrentSetTest {
             assertThat(set.contains(value3), is(false));
             assertThat(set.contains(value4), is(false));
             assertThat(set.target.target.size(), is(0));
+            assertThat(set.iterator().hasNext(), is(false));
         }
 
         protected void triggerClean() {
         }
     }
-
 }
