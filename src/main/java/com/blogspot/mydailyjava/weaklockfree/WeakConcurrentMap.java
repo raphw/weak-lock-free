@@ -3,7 +3,9 @@ package com.blogspot.mydailyjava.weaklockfree;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -135,14 +137,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
     @Override
     public Iterator<Map.Entry<K, V>> iterator() {
-        List<SimpleEntry> entries = new ArrayList<SimpleEntry>();
-        for (WeakKey<K> weakKey : target.keySet()) {
-            K key = weakKey.get();
-            if (key != null) {
-                entries.add(new SimpleEntry(key, weakKey));
-            }
-        }
-        return new EntryIterator(entries);
+        return new EntryIterator(target.entrySet().iterator());
     }
 
     /*
@@ -268,23 +263,44 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
     private class EntryIterator implements Iterator<Map.Entry<K, V>> {
 
-        private final List<SimpleEntry> entries;
+        private final Iterator<Map.Entry<WeakKey<K>, V>> iterator;
 
-        private EntryIterator(List<SimpleEntry> entries) {
-            this.entries = entries;
+        private Map.Entry<WeakKey<K>, V> nextEntry;
+
+        private K nextKey;
+
+        private EntryIterator(Iterator<Map.Entry<WeakKey<K>, V>> iterator) {
+            this.iterator = iterator;
+            findNext();
+        }
+
+        private void findNext() {
+            while (iterator.hasNext()) {
+                nextEntry = iterator.next();
+                nextKey = nextEntry.getKey().get();
+                if (nextKey != null) {
+                    return;
+                }
+            }
+            nextEntry = null;
+            nextKey = null;
         }
 
         @Override
         public boolean hasNext() {
-            return !entries.isEmpty();
+            return nextKey != null;
         }
 
         @Override
         public Map.Entry<K, V> next() {
-            if (entries.isEmpty()) {
+            if (nextKey == null) {
                 throw new NoSuchElementException();
             }
-            return entries.remove(0);
+            try {
+                return new SimpleEntry(nextKey, nextEntry);
+            } finally {
+                findNext();
+            }
         }
 
         @Override
@@ -297,11 +313,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         private final K key;
 
-        final WeakKey<K> weakKey;
+        final Map.Entry<WeakKey<K>, V> entry;
 
-        private SimpleEntry(K key, WeakKey<K> weakKey) {
+        private SimpleEntry(K key, Map.Entry<WeakKey<K>, V> entry) {
             this.key = key;
-            this.weakKey = weakKey;
+            this.entry = entry;
         }
 
         @Override
@@ -311,13 +327,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         @Override
         public V getValue() {
-            return get(key);
+            return entry.getValue();
         }
 
         @Override
         public V setValue(V value) {
             if (value == null) throw new NullPointerException();
-            return target.put(weakKey, value);
+            return entry.setValue(value);
         }
     }
 }
