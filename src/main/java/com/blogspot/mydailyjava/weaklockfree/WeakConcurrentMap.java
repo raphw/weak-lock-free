@@ -3,6 +3,9 @@ package com.blogspot.mydailyjava.weaklockfree;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -13,9 +16,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * equal only by reference equality.
  * </p>
  * This class does not implement the {@link java.util.Map} interface because this implementation is incompatible
- * with the map contract.
+ * with the map contract. While iterating over a map's entries, any key that has not passed iteration is referenced non-weakly.
  */
-public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable {
+public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable, Iterable<Map.Entry<K, V>> {
 
     private static final AtomicLong ID = new AtomicLong();
 
@@ -45,7 +48,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V get(K key) {
         if (key == null) throw new NullPointerException();
-        V value = target.get(new WeakKey<K>(key));
+        V value = target.get(new LatentKey<K>(key));
         if (value == null) {
             value = defaultValue(key);
             if (value != null) {
@@ -63,7 +66,8 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * @return {@code true} if the key already defines a value.
      */
     public boolean containsKey(K key) {
-        return target.containsKey(new WeakKey<K>(key));
+        if (key == null) throw new NullPointerException();
+        return target.containsKey(new LatentKey<K>(key));
     }
 
     /**
@@ -82,7 +86,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        return target.remove(new WeakKey<K>(key));
+        return target.remove(new LatentKey<K>(key));
     }
 
     /**
@@ -97,7 +101,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * in case that another thread requests a value for a key concurrently.
      *
      * @param key The key for which to create a default value.
-     * @return The default value for a key without value.
+     * @return The default value for a key without value or {@code null} for not defining a default value.
      */
     protected V defaultValue(K key) {
         return null;
@@ -108,6 +112,16 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public Thread getCleanerThread() {
         return thread;
+    }
+
+    /**
+     * Cleans all unused references.
+     */
+    public void expungeStaleEntries() {
+        Reference<?> reference;
+        while ((reference = poll()) != null) {
+            target.remove(reference);
+        }
     }
 
     /**
@@ -128,6 +142,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         } catch (InterruptedException ignored) {
             clear();
         }
+    }
+
+    @Override
+    public Iterator<Map.Entry<K, V>> iterator() {
+        return new EntryIterator(target.entrySet().iterator());
     }
 
     /*
@@ -160,14 +179,10 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      *
      * Therefore, we can guarantee that there is no memory leak.
      */
+
     private static class WeakKey<T> extends WeakReference<T> {
 
         private final int hashCode;
-
-        WeakKey(T key) {
-            super(key);
-            hashCode = System.identityHashCode(key);
-        }
 
         WeakKey(T key, ReferenceQueue<? super T> queue) {
             super(key, queue);
@@ -181,7 +196,43 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         @Override
         public boolean equals(Object other) {
-            return ((WeakKey<?>) other).get() == get();
+            if (other instanceof LatentKey<?>) {
+                return ((LatentKey<?>) other).key == get();
+            } else {
+                return ((WeakKey<?>) other).get() == get();
+            }
+        }
+    }
+
+    /*
+     * A latent key must only be used for looking up instances within a map. For this to work, it implements an identical contract for
+     * hash code and equals as the WeakKey implementation. At the same time, the latent key implementation does not extend WeakReference
+     * and avoids the overhead that a weak reference implies.
+     */
+
+    private static class LatentKey<T> {
+
+        final T key;
+
+        private final int hashCode;
+
+        LatentKey(T key) {
+            this.key = key;
+            hashCode = System.identityHashCode(key);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (other instanceof LatentKey<?>) {
+                return ((LatentKey<?>) other).key == key;
+            } else {
+                return ((WeakKey<?>) other).get() == key;
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return hashCode;
         }
     }
 
@@ -217,12 +268,81 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
             expungeStaleEntries();
             return super.remove(key);
         }
+    }
 
-        void expungeStaleEntries() {
-            Reference<?> reference;
-            while ((reference = poll()) != null) {
-                target.remove(reference);
+    private class EntryIterator implements Iterator<Map.Entry<K, V>> {
+
+        private final Iterator<Map.Entry<WeakKey<K>, V>> iterator;
+
+        private Map.Entry<WeakKey<K>, V> nextEntry;
+
+        private K nextKey;
+
+        private EntryIterator(Iterator<Map.Entry<WeakKey<K>, V>> iterator) {
+            this.iterator = iterator;
+            findNext();
+        }
+
+        private void findNext() {
+            while (iterator.hasNext()) {
+                nextEntry = iterator.next();
+                nextKey = nextEntry.getKey().get();
+                if (nextKey != null) {
+                    return;
+                }
             }
+            nextEntry = null;
+            nextKey = null;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return nextKey != null;
+        }
+
+        @Override
+        public Map.Entry<K, V> next() {
+            if (nextKey == null) {
+                throw new NoSuchElementException();
+            }
+            try {
+                return new SimpleEntry(nextKey, nextEntry);
+            } finally {
+                findNext();
+            }
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private class SimpleEntry implements Map.Entry<K, V> {
+
+        private final K key;
+
+        final Map.Entry<WeakKey<K>, V> entry;
+
+        private SimpleEntry(K key, Map.Entry<WeakKey<K>, V> entry) {
+            this.key = key;
+            this.entry = entry;
+        }
+
+        @Override
+        public K getKey() {
+            return key;
+        }
+
+        @Override
+        public V getValue() {
+            return entry.getValue();
+        }
+
+        @Override
+        public V setValue(V value) {
+            if (value == null) throw new NullPointerException();
+            return entry.setValue(value);
         }
     }
 }

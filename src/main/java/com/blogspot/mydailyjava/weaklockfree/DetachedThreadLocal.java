@@ -79,6 +79,22 @@ public class DetachedThreadLocal<T> implements Runnable {
     }
 
     /**
+     * @param thread The thread for which to set a thread-local value.
+     * @return The value accociated with this thread.
+     */
+    public T get(Thread thread) {
+        return map.get(thread);
+    }
+
+    /**
+     * @param thread The thread for which to set a thread-local value.
+     * @param value  The value to set.
+     */
+    public void define(Thread thread, T value) {
+        map.put(thread, value);
+    }
+
+    /**
      * @param thread The thread for which an initial value is created.
      * @return The initial value for any thread local. If no default is set, the default value is {@code null}.
      */

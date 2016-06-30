@@ -2,6 +2,8 @@ package com.blogspot.mydailyjava.weaklockfree;
 
 import org.junit.Test;
 
+import java.util.*;
+
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -63,6 +65,15 @@ public class WeakConcurrentMapTest {
             assertThat(map.get(key2), is(value2));
             assertThat(map.get(key3), is(value3));
             assertThat(map.get(key4), is(value4));
+            Map<Object, Object> values = new HashMap<Object, Object>();
+            values.put(key1, value1);
+            values.put(key2, value2);
+            values.put(key3, value3);
+            values.put(key4, value4);
+            for (Map.Entry<Object, Object> entry : map) {
+                assertThat(values.remove(entry.getKey()), is(entry.getValue()));
+            }
+            assertThat(values.isEmpty(), is(true));
             key1 = key2 = null; // Make eligible for GC
             System.gc();
             Thread.sleep(200L);
@@ -81,6 +92,7 @@ public class WeakConcurrentMapTest {
             assertThat(map.get(key4), nullValue());
             assertThat(map.approximateSize(), is(0));
             assertThat(map.target.size(), is(0));
+            assertThat(map.iterator().hasNext(), is(false));
         }
 
         protected void triggerClean() {
