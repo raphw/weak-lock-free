@@ -18,7 +18,7 @@ public class WeakConcurrentSetTest {
         new SetTestCase(set) {
             @Override
             protected void triggerClean() {
-                ((WeakConcurrentMap.WithInlinedExpunction<?, ?>) set.target).expungeStaleEntries();
+                set.target.expungeStaleEntries();
             }
         }.doTest();
     }

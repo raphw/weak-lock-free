@@ -268,6 +268,18 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
             expungeStaleEntries();
             return super.remove(key);
         }
+
+        @Override
+        public Iterator<Map.Entry<K, V>> iterator() {
+            expungeStaleEntries();
+            return super.iterator();
+        }
+
+        @Override
+        public int approximateSize() {
+            expungeStaleEntries();
+            return super.approximateSize();
+        }
     }
 
     private class EntryIterator implements Iterator<Map.Entry<K, V>> {

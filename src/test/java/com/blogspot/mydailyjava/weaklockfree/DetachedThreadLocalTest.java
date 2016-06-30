@@ -17,7 +17,7 @@ public class DetachedThreadLocalTest {
         new ThreadLocalTestCase(threadLocal) {
             @Override
             protected void triggerClean() {
-                ((WeakConcurrentMap.WithInlinedExpunction<?, ?>) threadLocal.map).expungeStaleEntries();
+                threadLocal.map.expungeStaleEntries();
             }
         }.doTest();
     }
