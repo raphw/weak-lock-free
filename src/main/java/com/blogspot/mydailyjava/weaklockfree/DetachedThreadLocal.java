@@ -95,10 +95,10 @@ public class DetachedThreadLocal<T> implements Runnable {
     }
 
     /**
-     * @return The cleaner thread or {@code null} if no such thread was set.
+     * @return The weak map that backs this detached thread local.
      */
-    public Thread getCleanerThread() {
-        return map.getCleanerThread();
+    public WeakConcurrentMap<Thread, T> getBackingMap() {
+        return map;
     }
 
     @Override

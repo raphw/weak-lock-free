@@ -34,6 +34,15 @@ public class WeakConcurrentSet<V> implements Runnable {
         target.clear();
     }
 
+    /**
+     * Returns the approximate size of this set where the returned number is at least as big as the actual number of entries.
+     *
+     * @return The minimum size of this set.
+     */
+    public int approximateSize() {
+        return target.approximateSize();
+    }
+
     @Override
     public void run() {
         target.run();

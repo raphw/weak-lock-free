@@ -13,7 +13,7 @@ public class DetachedThreadLocalTest {
     @Test
     public void testLocalExpunction() throws Exception {
         final DetachedThreadLocal<Object> threadLocal = new DetachedThreadLocal<Object>(DetachedThreadLocal.Cleaner.INLINE);
-        assertThat(threadLocal.getCleanerThread(), nullValue(Thread.class));
+        assertThat(threadLocal.getBackingMap().getCleanerThread(), nullValue(Thread.class));
         new ThreadLocalTestCase(threadLocal) {
             @Override
             protected void triggerClean() {
@@ -25,7 +25,7 @@ public class DetachedThreadLocalTest {
     @Test
     public void testExternalThread() throws Exception {
         DetachedThreadLocal<Object> threadLocal = new DetachedThreadLocal<Object>(DetachedThreadLocal.Cleaner.MANUAL);
-        assertThat(threadLocal.getCleanerThread(), nullValue(Thread.class));
+        assertThat(threadLocal.getBackingMap().getCleanerThread(), nullValue(Thread.class));
         Thread thread = new Thread(threadLocal);
         thread.start();
         new ThreadLocalTestCase(threadLocal).doTest();
@@ -37,11 +37,11 @@ public class DetachedThreadLocalTest {
     @Test
     public void testInternalThread() throws Exception {
         DetachedThreadLocal<Object> threadLocal = new DetachedThreadLocal<Object>(DetachedThreadLocal.Cleaner.THREAD);
-        assertThat(threadLocal.getCleanerThread(), not(nullValue(Thread.class)));
+        assertThat(threadLocal.getBackingMap().getCleanerThread(), not(nullValue(Thread.class)));
         new ThreadLocalTestCase(threadLocal).doTest();
-        threadLocal.getCleanerThread().interrupt();
+        threadLocal.getBackingMap().getCleanerThread().interrupt();
         Thread.sleep(200L);
-        assertThat(threadLocal.getCleanerThread().isAlive(), is(false));
+        assertThat(threadLocal.getBackingMap().getCleanerThread().isAlive(), is(false));
     }
 
     private class ThreadLocalTestCase {

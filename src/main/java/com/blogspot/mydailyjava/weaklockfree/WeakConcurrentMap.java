@@ -67,7 +67,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /**
-     * @param key The key of the entry.
+     * @param key   The key of the entry.
      * @param value The value of the entry.
      * @return The previous entry or {@code null} if it does not exist.
      */
@@ -108,6 +108,15 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public Thread getCleanerThread() {
         return thread;
+    }
+
+    /**
+     * Returns the approximate size of this map where the returned number is at least as big as the actual number of entries.
+     *
+     * @return The minimum size of this map.
+     */
+    public int approximateSize() {
+        return target.size();
     }
 
     @Override

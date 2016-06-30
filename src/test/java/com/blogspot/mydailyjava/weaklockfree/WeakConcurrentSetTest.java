@@ -65,14 +65,17 @@ public class WeakConcurrentSetTest {
             triggerClean();
             assertThat(set.contains(value3), is(true));
             assertThat(set.contains(value4), is(true));
+            assertThat(set.approximateSize(), is(2));
             assertThat(set.target.target.size(), is(2));
             assertThat(set.remove(value3), is(true));
             assertThat(set.contains(value3), is(false));
             assertThat(set.contains(value4), is(true));
+            assertThat(set.approximateSize(), is(1));
             assertThat(set.target.target.size(), is(1));
             set.clear();
             assertThat(set.contains(value3), is(false));
             assertThat(set.contains(value4), is(false));
+            assertThat(set.approximateSize(), is(0));
             assertThat(set.target.target.size(), is(0));
         }
 
