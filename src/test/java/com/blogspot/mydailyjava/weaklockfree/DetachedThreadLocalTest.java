@@ -67,6 +67,8 @@ public class DetachedThreadLocalTest {
             threads.clear();
             System.gc();
             Thread.sleep(1500L);
+            System.gc();
+            Thread.sleep(1500L);
             triggerClean();
             assertThat(threadLocal.map.target.size(), is(0));
         }
