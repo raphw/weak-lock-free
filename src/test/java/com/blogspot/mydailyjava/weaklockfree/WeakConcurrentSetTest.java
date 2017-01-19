@@ -92,4 +92,18 @@ public class WeakConcurrentSetTest {
         protected void triggerClean() {
         }
     }
+
+    @Test
+    public void testSetContract() throws Exception {
+        final WeakConcurrentSet<Object> set = new WeakConcurrentSet<Object>(WeakConcurrentSet.Cleaner.INLINE);
+        Object obj = new Object();
+        assertThat(set.contains(obj), is(false));
+        assertThat(set.remove(obj), is(false));
+        assertThat(set.add(obj), is(true));
+        assertThat(set.add(obj), is(false));
+        assertThat(set.contains(obj), is(true));
+        assertThat(set.remove(obj), is(true));
+        assertThat(set.contains(obj), is(false));
+        assertThat(set.remove(obj), is(false));
+    }
 }
