@@ -79,11 +79,13 @@ public class WeakConcurrentMapTest {
             Thread.sleep(200L);
             triggerClean();
             assertThat(map.get(key3), is(value3));
+            assertThat(map.getIfPresent(key3), is(value3));
             assertThat(map.get(key4), is(value4));
             assertThat(map.approximateSize(), is(2));
             assertThat(map.target.size(), is(2));
             assertThat(map.remove(key3), is(value3));
             assertThat(map.get(key3), nullValue());
+            assertThat(map.getIfPresent(key3), nullValue());
             assertThat(map.get(key4), is(value4));
             assertThat(map.approximateSize(), is(1));
             assertThat(map.target.size(), is(1));

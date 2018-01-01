@@ -39,6 +39,10 @@ public class DetachedThreadLocal<T> implements Runnable {
         return map.get(Thread.currentThread());
     }
 
+    public T getIfPresent() {
+      return map.getIfPresent(Thread.currentThread());
+    }
+
     public void set(T value) {
         map.put(Thread.currentThread(), value);
     }

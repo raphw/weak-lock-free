@@ -63,6 +63,15 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
     /**
      * @param key The key of the entry.
+     * @return The value of the entry or null if it did not exist.
+     */
+    public V getIfPresent(K key) {
+        if (key == null) throw new NullPointerException();
+        return target.get(new LatentKey<K>(key));
+    }
+
+    /**
+     * @param key The key of the entry.
      * @return {@code true} if the key already defines a value.
      */
     public boolean containsKey(K key) {
