@@ -90,6 +90,27 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /**
+     * @param key   The key of the entry.
+     * @param value The value of the entry.
+     * @return The previous entry or {@code null} if it does not exist.
+     */
+    public V putIfAbsent(K key, V value) {
+        if (key == null || value == null) throw new NullPointerException();
+        V previous = target.get(new LatentKey<K>(key));
+        return previous == null ? target.putIfAbsent(new WeakKey<K>(key, this), value) : previous;
+    }
+
+    /**
+     * @param key   The key of the entry.
+     * @param value The value of the entry.
+     * @return The previous entry or {@code null} if it does not exist.
+     */
+    public V putIfProbablyAbsent(K key, V value) {
+        if (key == null || value == null) throw new NullPointerException();
+        return target.putIfAbsent(new WeakKey<K>(key, this), value);
+    }
+
+    /**
      * @param key The key of the entry.
      * @return The removed entry or {@code null} if it does not exist.
      */
