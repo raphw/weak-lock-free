@@ -27,6 +27,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     private final Thread thread;
 
     /**
+     * Latent keys are cached thread-locally to avoid allocations on lookups.
+     * This is beneficial as the JIT unfortunately can't reliably replace the LatentKey allocation with stack allocations,
+     * even though the LatentKey does not escape.
+     */
+    private final ThreadLocal<LatentKey<K>> latentKeyThreadLocal = new ThreadLocal<LatentKey<K>>();
+
+    /**
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      */
     public WeakConcurrentMap(boolean cleanerThread) {
@@ -48,7 +55,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V get(K key) {
         if (key == null) throw new NullPointerException();
-        V value = target.get(new LatentKey<K>(key));
+        V value;
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            value = target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
         if (value == null) {
             value = defaultValue(key);
             if (value != null) {
@@ -61,13 +74,29 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return value;
     }
 
+    private LatentKey<K> getKey(K key) {
+        LatentKey<K> latentKey = latentKeyThreadLocal.get();
+        if (latentKey != null) {
+            return latentKey.set(key);
+        } else {
+            latentKey = new LatentKey<K>().set(key);
+            latentKeyThreadLocal.set(latentKey);
+            return latentKey;
+        }
+    }
+
     /**
      * @param key The key of the entry.
      * @return The value of the entry or null if it did not exist.
      */
     public V getIfPresent(K key) {
         if (key == null) throw new NullPointerException();
-        return target.get(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -76,7 +105,12 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public boolean containsKey(K key) {
         if (key == null) throw new NullPointerException();
-        return target.containsKey(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.containsKey(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -96,7 +130,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V putIfAbsent(K key, V value) {
         if (key == null || value == null) throw new NullPointerException();
-        V previous = target.get(new LatentKey<K>(key));
+        V previous;
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            previous = target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
         return previous == null ? target.putIfAbsent(new WeakKey<K>(key, this), value) : previous;
     }
 
@@ -116,7 +156,12 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        return target.remove(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.remove(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -240,15 +285,25 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * and avoids the overhead that a weak reference implies.
      */
 
+    // can't use AutoClosable/try-with-resources as this project still supports Java 6
     private static class LatentKey<T> {
 
-        final T key;
+        T key;
 
-        private final int hashCode;
+        private int hashCode;
 
-        LatentKey(T key) {
+        LatentKey<T> set(T key) {
             this.key = key;
             hashCode = System.identityHashCode(key);
+            return this;
+        }
+
+        /**
+         * Failing to reset a latent key can lead to memory leaks as the key is strongly referenced.
+         */
+        void reset() {
+            key = null;
+            hashCode = 0;
         }
 
         @Override
