@@ -31,7 +31,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * This is beneficial as the JIT unfortunately can't reliably replace the LatentKey allocation with stack allocations,
      * even though the LatentKey does not escape.
      */
-    private final ThreadLocal<LatentKey<K>> latentKeyThreadLocal = new ThreadLocal<LatentKey<K>>();
+    private static final ThreadLocal<LatentKey<?>> latentKeyThreadLocal = new ThreadLocal<LatentKey<?>>();
 
     /**
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
@@ -75,7 +75,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     private LatentKey<K> getKey(K key) {
-        LatentKey<K> latentKey = latentKeyThreadLocal.get();
+        LatentKey<K> latentKey = (LatentKey<K>) latentKeyThreadLocal.get();
         if (latentKey != null) {
             return latentKey.set(key);
         } else {
