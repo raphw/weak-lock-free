@@ -28,15 +28,50 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
     /**
      * Latent keys are cached thread-locally to avoid allocations on lookups.
-     * This is beneficial as the JIT unfortunately can't reliably replace the LatentKey allocation with stack allocations,
-     * even though the LatentKey does not escape.
+     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LatentKey} allocation with stack allocations,
+     * even though the {@link LatentKey} does not escape.
      */
-    private static final ThreadLocal<LatentKey<?>> latentKeyThreadLocal = new ThreadLocal<LatentKey<?>>();
+    private static final ThreadLocal<LatentKey<?>> latentKeyThreadLocal = new ThreadLocal<LatentKey<?>>() {
+        @Override
+        protected LatentKey<?> initialValue() {
+            return new LatentKey<Object>();
+        }
+    };
+
+    private final boolean reuseKeys;
 
     /**
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      */
     public WeakConcurrentMap(boolean cleanerThread) {
+        this(cleanerThread, !canBeUnloaded(WeakConcurrentMap.class.getClassLoader()));
+    }
+
+    /**
+     * Checks whether the provided {@link ClassLoader} may be unloaded like a web application class loader, for example.
+     * <p>
+     * If the class loader can't be unloaded, it is safe to use {@link ThreadLocal}s and to reuse the {@link LatentKey}.
+     * Otherwise, the use of {@link ThreadLocal}s may lead to class loader leaks as it prevents the class loader this class
+     * is loaded by to unload.
+     * </p>
+     *
+     * @param classLoader The class loader to check.
+     * @return {@code true} if the provided class loader can be unloaded.
+     */
+    private static boolean canBeUnloaded(ClassLoader classLoader) {
+        return classLoader != ClassLoader.getSystemClassLoader()
+                && classLoader != ClassLoader.getSystemClassLoader().getParent() // ext/platfrom class loader
+                && classLoader != null; // bootstrap class loader
+    }
+
+    /**
+     * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
+     * @param reuseKeys     {@code true} if the lookup keys should be reused via a {@link ThreadLocal}.
+     *                      Note that setting this to {@code true} may result in class loader leaks.
+     *                      See {@link #canBeUnloaded(ClassLoader)} for more details.
+     */
+    public WeakConcurrentMap(boolean cleanerThread, boolean reuseKeys) {
+        this.reuseKeys = reuseKeys;
         target = new ConcurrentHashMap<WeakKey<K>, V>();
         if (cleanerThread) {
             thread = new Thread(this);
@@ -75,14 +110,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     private LatentKey<K> getKey(K key) {
-        LatentKey<K> latentKey = (LatentKey<K>) latentKeyThreadLocal.get();
-        if (latentKey != null) {
-            return latentKey.set(key);
+        final LatentKey<K> latentKey;
+        if (reuseKeys) {
+            latentKey = (LatentKey<K>) latentKeyThreadLocal.get();
         } else {
-            latentKey = new LatentKey<K>().set(key);
-            latentKeyThreadLocal.set(latentKey);
-            return latentKey;
+            latentKey = new LatentKey<K>();
         }
+        return latentKey.set(key);
     }
 
     /**
