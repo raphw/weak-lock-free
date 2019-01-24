@@ -20,23 +20,23 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnable, Iterable<Map.Entry<K, V>> {
 
-    private static final AtomicLong ID = new AtomicLong();
-
-    final ConcurrentMap<WeakKey<K>, V> target;
-
-    private final Thread thread;
-
     /**
      * Latent keys are cached thread-locally to avoid allocations on lookups.
-     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LatentKey} allocation with stack allocations,
-     * even though the {@link LatentKey} does not escape.
+     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LatentKey} allocation
+     * with stack allocations, even though the {@link LatentKey} does not escape.
      */
-    private static final ThreadLocal<LatentKey<?>> latentKeyThreadLocal = new ThreadLocal<LatentKey<?>>() {
+    private static final ThreadLocal<LatentKey<?>> LATENT_KEY_CACHE = new ThreadLocal<LatentKey<?>>() {
         @Override
         protected LatentKey<?> initialValue() {
             return new LatentKey<Object>();
         }
     };
+
+    private static final AtomicLong ID = new AtomicLong();
+
+    final ConcurrentMap<WeakKey<K>, V> target;
+
+    private final Thread thread;
 
     private final boolean reuseKeys;
 
@@ -44,7 +44,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      */
     public WeakConcurrentMap(boolean cleanerThread) {
-        this(cleanerThread, !canBeUnloaded(WeakConcurrentMap.class.getClassLoader()));
+        this(cleanerThread, isPersistentClassLoader(LatentKey.class.getClassLoader()));
     }
 
     /**
@@ -58,17 +58,21 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * @param classLoader The class loader to check.
      * @return {@code true} if the provided class loader can be unloaded.
      */
-    private static boolean canBeUnloaded(ClassLoader classLoader) {
-        return classLoader != ClassLoader.getSystemClassLoader()
-                && classLoader != ClassLoader.getSystemClassLoader().getParent() // ext/platfrom class loader
-                && classLoader != null; // bootstrap class loader
+    private static boolean isPersistentClassLoader(ClassLoader classLoader) {
+        try {
+            return classLoader == null // bootstrap class loader
+                    || classLoader == ClassLoader.getSystemClassLoader()
+                    || classLoader == ClassLoader.getSystemClassLoader().getParent(); // ext/platfrom class loader;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     /**
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      * @param reuseKeys     {@code true} if the lookup keys should be reused via a {@link ThreadLocal}.
      *                      Note that setting this to {@code true} may result in class loader leaks.
-     *                      See {@link #canBeUnloaded(ClassLoader)} for more details.
+     *                      See {@link #isPersistentClassLoader(ClassLoader)} for more details.
      */
     public WeakConcurrentMap(boolean cleanerThread, boolean reuseKeys) {
         this.reuseKeys = reuseKeys;
@@ -91,7 +95,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     public V get(K key) {
         if (key == null) throw new NullPointerException();
         V value;
-        final LatentKey<K> latentKey = getKey(key);
+        LatentKey<K> latentKey = getKey(key);
         try {
             value = target.get(latentKey);
         } finally {
@@ -109,14 +113,15 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return value;
     }
 
+    @SuppressWarnings("unchecked")
     private LatentKey<K> getKey(K key) {
-        final LatentKey<K> latentKey;
+        LatentKey<K> latentKey;
         if (reuseKeys) {
-            latentKey = (LatentKey<K>) latentKeyThreadLocal.get();
+            latentKey = (LatentKey<K>) LATENT_KEY_CACHE.get();
         } else {
             latentKey = new LatentKey<K>();
         }
-        return latentKey.set(key);
+        return latentKey.withValue(key);
     }
 
     /**
@@ -125,7 +130,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V getIfPresent(K key) {
         if (key == null) throw new NullPointerException();
-        final LatentKey<K> latentKey = getKey(key);
+        LatentKey<K> latentKey = getKey(key);
         try {
             return target.get(latentKey);
         } finally {
@@ -139,7 +144,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public boolean containsKey(K key) {
         if (key == null) throw new NullPointerException();
-        final LatentKey<K> latentKey = getKey(key);
+        LatentKey<K> latentKey = getKey(key);
         try {
             return target.containsKey(latentKey);
         } finally {
@@ -165,7 +170,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     public V putIfAbsent(K key, V value) {
         if (key == null || value == null) throw new NullPointerException();
         V previous;
-        final LatentKey<K> latentKey = getKey(key);
+        LatentKey<K> latentKey = getKey(key);
         try {
             previous = target.get(latentKey);
         } finally {
@@ -190,7 +195,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        final LatentKey<K> latentKey = getKey(key);
+        LatentKey<K> latentKey = getKey(key);
         try {
             return target.remove(latentKey);
         } finally {
@@ -245,11 +250,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     @Override
     public void run() {
         try {
-            while (true) {
+            while (!Thread.interrupted()) {
                 target.remove(remove());
             }
         } catch (InterruptedException ignored) {
-            clear();
+            // do nothing
         }
     }
 
@@ -326,7 +331,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         private int hashCode;
 
-        LatentKey<T> set(T key) {
+        LatentKey<T> withValue(T key) {
             this.key = key;
             hashCode = System.identityHashCode(key);
             return this;
