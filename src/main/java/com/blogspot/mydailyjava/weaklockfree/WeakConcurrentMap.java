@@ -27,9 +27,51 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     private final Thread thread;
 
     /**
+     * Latent keys are cached thread-locally to avoid allocations on lookups.
+     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LatentKey} allocation with stack allocations,
+     * even though the {@link LatentKey} does not escape.
+     */
+    private static final ThreadLocal<LatentKey<?>> latentKeyThreadLocal = new ThreadLocal<LatentKey<?>>() {
+        @Override
+        protected LatentKey<?> initialValue() {
+            return new LatentKey<Object>();
+        }
+    };
+
+    private final boolean reuseKeys;
+
+    /**
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      */
     public WeakConcurrentMap(boolean cleanerThread) {
+        this(cleanerThread, !canBeUnloaded(WeakConcurrentMap.class.getClassLoader()));
+    }
+
+    /**
+     * Checks whether the provided {@link ClassLoader} may be unloaded like a web application class loader, for example.
+     * <p>
+     * If the class loader can't be unloaded, it is safe to use {@link ThreadLocal}s and to reuse the {@link LatentKey}.
+     * Otherwise, the use of {@link ThreadLocal}s may lead to class loader leaks as it prevents the class loader this class
+     * is loaded by to unload.
+     * </p>
+     *
+     * @param classLoader The class loader to check.
+     * @return {@code true} if the provided class loader can be unloaded.
+     */
+    private static boolean canBeUnloaded(ClassLoader classLoader) {
+        return classLoader != ClassLoader.getSystemClassLoader()
+                && classLoader != ClassLoader.getSystemClassLoader().getParent() // ext/platfrom class loader
+                && classLoader != null; // bootstrap class loader
+    }
+
+    /**
+     * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
+     * @param reuseKeys     {@code true} if the lookup keys should be reused via a {@link ThreadLocal}.
+     *                      Note that setting this to {@code true} may result in class loader leaks.
+     *                      See {@link #canBeUnloaded(ClassLoader)} for more details.
+     */
+    public WeakConcurrentMap(boolean cleanerThread, boolean reuseKeys) {
+        this.reuseKeys = reuseKeys;
         target = new ConcurrentHashMap<WeakKey<K>, V>();
         if (cleanerThread) {
             thread = new Thread(this);
@@ -48,7 +90,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V get(K key) {
         if (key == null) throw new NullPointerException();
-        V value = target.get(new LatentKey<K>(key));
+        V value;
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            value = target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
         if (value == null) {
             value = defaultValue(key);
             if (value != null) {
@@ -61,13 +109,28 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return value;
     }
 
+    private LatentKey<K> getKey(K key) {
+        final LatentKey<K> latentKey;
+        if (reuseKeys) {
+            latentKey = (LatentKey<K>) latentKeyThreadLocal.get();
+        } else {
+            latentKey = new LatentKey<K>();
+        }
+        return latentKey.set(key);
+    }
+
     /**
      * @param key The key of the entry.
      * @return The value of the entry or null if it did not exist.
      */
     public V getIfPresent(K key) {
         if (key == null) throw new NullPointerException();
-        return target.get(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -76,7 +139,12 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public boolean containsKey(K key) {
         if (key == null) throw new NullPointerException();
-        return target.containsKey(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.containsKey(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -96,7 +164,13 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V putIfAbsent(K key, V value) {
         if (key == null || value == null) throw new NullPointerException();
-        V previous = target.get(new LatentKey<K>(key));
+        V previous;
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            previous = target.get(latentKey);
+        } finally {
+            latentKey.reset();
+        }
         return previous == null ? target.putIfAbsent(new WeakKey<K>(key, this), value) : previous;
     }
 
@@ -116,7 +190,12 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        return target.remove(new LatentKey<K>(key));
+        final LatentKey<K> latentKey = getKey(key);
+        try {
+            return target.remove(latentKey);
+        } finally {
+            latentKey.reset();
+        }
     }
 
     /**
@@ -240,15 +319,25 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      * and avoids the overhead that a weak reference implies.
      */
 
+    // can't use AutoClosable/try-with-resources as this project still supports Java 6
     private static class LatentKey<T> {
 
-        final T key;
+        T key;
 
-        private final int hashCode;
+        private int hashCode;
 
-        LatentKey(T key) {
+        LatentKey<T> set(T key) {
             this.key = key;
             hashCode = System.identityHashCode(key);
+            return this;
+        }
+
+        /**
+         * Failing to reset a latent key can lead to memory leaks as the key is strongly referenced.
+         */
+        void reset() {
+            key = null;
+            hashCode = 0;
         }
 
         @Override
