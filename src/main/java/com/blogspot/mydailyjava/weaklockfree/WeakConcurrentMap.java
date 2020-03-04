@@ -300,11 +300,9 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         private final int hashCode;
 
-        private T key;
 
          WeakKey(T key, ReferenceQueue<? super T> queue) {
             super(key, queue);
-            this.key = key;
             hashCode = System.identityHashCode(key);
         }
 
@@ -324,7 +322,7 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         @Override
         public String toString(){
-            return valueOf(key);
+            return valueOf(get());
         }
     }
 
