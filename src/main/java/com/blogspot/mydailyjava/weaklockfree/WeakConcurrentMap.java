@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.lang.String.valueOf;
+
 /**
  * <p>
  * A thread-safe map with weak keys. Entries are based on a key's system hash code and keys are considered
@@ -298,8 +300,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
 
         private final int hashCode;
 
-        WeakKey(T key, ReferenceQueue<? super T> queue) {
+        private T key;
+
+         WeakKey(T key, ReferenceQueue<? super T> queue) {
             super(key, queue);
+            this.key = key;
             hashCode = System.identityHashCode(key);
         }
 
@@ -315,6 +320,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
             } else {
                 return ((WeakKey<?>) other).get() == get();
             }
+        }
+
+        @Override
+        public String toString(){
+            return valueOf(key);
         }
     }
 
