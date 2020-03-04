@@ -487,4 +487,9 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
             return entry.setValue(value);
         }
     }
+
+    @Override
+    public String toString(){
+        return target.toString();
+    }
 }
