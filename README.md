@@ -14,6 +14,6 @@ The library is hosted on *Maven Central* and *JCenter*:
 <dependency>
   <groupId>com.blogspot.mydailyjava</groupId>
   <artifactId>weak-lock-free</artifactId>
-  <version>0.12</version>
+  <version>LATEST</version>
 </dependency>
 ```

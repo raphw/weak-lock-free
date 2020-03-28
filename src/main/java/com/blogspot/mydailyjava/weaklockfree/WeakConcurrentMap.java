@@ -265,6 +265,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return new EntryIterator(target.entrySet().iterator());
     }
 
+    @Override
+    public String toString(){
+        return target.toString();
+    }
+
     /*
      * Why this works:
      * ---------------
@@ -486,10 +491,5 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
             if (value == null) throw new NullPointerException();
             return entry.setValue(value);
         }
-    }
-
-    @Override
-    public String toString(){
-        return target.toString();
     }
 }

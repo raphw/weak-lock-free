@@ -1,5 +1,6 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -100,6 +101,11 @@ public class WeakConcurrentSet<V> implements Runnable, Iterable<V> {
     @Override
     public Iterator<V> iterator() {
         return new ReducingIterator<V>(target.iterator());
+    }
+
+    @Override
+    public String toString(){
+        return Collections.newSetFromMap(target.target).toString();
     }
 
     private static class ReducingIterator<V> implements Iterator<V> {
