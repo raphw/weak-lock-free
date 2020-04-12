@@ -46,7 +46,10 @@ public class WeakConcurrentMapTest {
 
     static class KeyEqualToWeakRefOfItself {
         @Override public boolean equals(Object obj) {
-            return super.equals(obj instanceof WeakReference ? ((WeakReference)obj).get(): obj);
+            if (obj instanceof WeakReference) {
+                return equals(((WeakReference) obj).get());
+            }
+            return super.equals(obj);
         }
     }
 
