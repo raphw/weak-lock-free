@@ -77,8 +77,19 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      *                      See {@link #isPersistentClassLoader(ClassLoader)} for more details.
      */
     public WeakConcurrentMap(boolean cleanerThread, boolean reuseKeys) {
+        this(cleanerThread, reuseKeys, new ConcurrentHashMap<WeakKey<K>, V>());
+    }
+
+    /**
+     * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
+     * @param reuseKeys     {@code true} if the lookup keys should be reused via a {@link ThreadLocal}.
+     *                      Note that setting this to {@code true} may result in class loader leaks.
+     *                      See {@link #isPersistentClassLoader(ClassLoader)} for more details.
+     * @param target        ConcurrentMap implementation that this class wraps.
+     */
+    public WeakConcurrentMap(boolean cleanerThread, boolean reuseKeys, ConcurrentMap<WeakKey<K>, V> target) {
         this.reuseKeys = reuseKeys;
-        target = new ConcurrentHashMap<WeakKey<K>, V>();
+        this.target = target;
         if (cleanerThread) {
             thread = new Thread(this);
             thread.setName("weak-ref-cleaner-" + ID.getAndIncrement());
