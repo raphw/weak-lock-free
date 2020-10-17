@@ -45,27 +45,26 @@ public class WeakConcurrentMapTest {
     }
 
     static class KeyEqualToWeakRefOfItself {
-        @Override public boolean equals(Object obj) {
-            if (obj instanceof WeakReference) {
-                return equals(((WeakReference) obj).get());
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof WeakReference<?>) {
+                return equals(((WeakReference<?>) obj).get());
             }
             return super.equals(obj);
         }
     }
 
-    static class CheapUnloadableWeakConcurrentMap
-        extends WeakConcurrentMap<KeyEqualToWeakRefOfItself, Object> {
+    static class CheapUnloadableWeakConcurrentMap extends AbstractWeakConcurrentMap<KeyEqualToWeakRefOfItself, Object, Object> {
 
-        CheapUnloadableWeakConcurrentMap() {
-            super(false);
-        }
 
-        @Override protected Object getLookupKey(KeyEqualToWeakRefOfItself key) {
+        @Override
+        protected Object getLookupKey(KeyEqualToWeakRefOfItself key) {
             return key;
         }
 
-        @Override protected void resetLookupKey(Object lookupKey) {
-        }
+        @Override
+        protected void resetLookupKey(Object lookupKey) { }
     }
 
     @Test
@@ -82,7 +81,7 @@ public class WeakConcurrentMapTest {
         assertThat(map.containsKey(key), is(false));
     }
 
-    private class MapTestCase {
+    private static class MapTestCase {
 
         private final WeakConcurrentMap<Object, Object> map;
 
@@ -136,7 +135,6 @@ public class WeakConcurrentMapTest {
             assertThat(map.iterator().hasNext(), is(false));
         }
 
-        protected void triggerClean() {
-        }
+        protected void triggerClean() { }
     }
 }
