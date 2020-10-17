@@ -108,11 +108,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     public V get(K key) {
         if (key == null) throw new NullPointerException();
         V value;
-        LatentKey<K> latentKey = getKey(key);
+        Object lookupKey = getLookupKey(key);
         try {
-            value = target.get(latentKey);
+            value = target.get(lookupKey);
         } finally {
-            latentKey.reset();
+            resetLookupKey(lookupKey);
         }
         if (value == null) {
             value = defaultValue(key);
@@ -126,8 +126,15 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
         return value;
     }
 
+    /**
+     * Override with care as it can cause lookup failures if done incorrectly. The result must have
+     * the same {@link Object#hashCode()} as the input and be {@link Object#equals(Object) equal to}
+     * a weak reference of the key. When overriding this, also override {@link #resetLookupKey}.
+     *
+     * <p>By default, this wraps in a {@link LatentKey} possibly sourced from a thread-local.
+     */
     @SuppressWarnings("unchecked")
-    private LatentKey<K> getKey(K key) {
+    protected Object getLookupKey(K key) {
         LatentKey<K> latentKey;
         if (reuseKeys) {
             latentKey = (LatentKey<K>) LATENT_KEY_CACHE.get();
@@ -138,16 +145,26 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     }
 
     /**
+     * Resets any reusable state in the {@linkplain #getLookupKey lookup key}. By default, this
+     * calls {@link LatentKey#reset()}.
+     */
+    protected void resetLookupKey(Object lookupKey) {
+        if (lookupKey instanceof WeakConcurrentMap.LatentKey) {
+            ((LatentKey) lookupKey).reset();
+        }
+    }
+
+    /**
      * @param key The key of the entry.
      * @return The value of the entry or null if it did not exist.
      */
     public V getIfPresent(K key) {
         if (key == null) throw new NullPointerException();
-        LatentKey<K> latentKey = getKey(key);
+        Object lookupKey = getLookupKey(key);
         try {
-            return target.get(latentKey);
+            return target.get(lookupKey);
         } finally {
-            latentKey.reset();
+            resetLookupKey(lookupKey);
         }
     }
 
@@ -157,11 +174,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public boolean containsKey(K key) {
         if (key == null) throw new NullPointerException();
-        LatentKey<K> latentKey = getKey(key);
+        Object lookupKey = getLookupKey(key);
         try {
-            return target.containsKey(latentKey);
+            return target.containsKey(lookupKey);
         } finally {
-            latentKey.reset();
+            resetLookupKey(lookupKey);
         }
     }
 
@@ -183,11 +200,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
     public V putIfAbsent(K key, V value) {
         if (key == null || value == null) throw new NullPointerException();
         V previous;
-        LatentKey<K> latentKey = getKey(key);
+        Object lookupKey = getLookupKey(key);
         try {
-            previous = target.get(latentKey);
+            previous = target.get(lookupKey);
         } finally {
-            latentKey.reset();
+            resetLookupKey(lookupKey);
         }
         return previous == null ? target.putIfAbsent(new WeakKey<K>(key, this), value) : previous;
     }
@@ -208,11 +225,11 @@ public class WeakConcurrentMap<K, V> extends ReferenceQueue<K> implements Runnab
      */
     public V remove(K key) {
         if (key == null) throw new NullPointerException();
-        LatentKey<K> latentKey = getKey(key);
+        Object lookupKey = getLookupKey(key);
         try {
-            return target.remove(latentKey);
+            return target.remove(lookupKey);
         } finally {
-            latentKey.reset();
+            resetLookupKey(lookupKey);
         }
     }
 
