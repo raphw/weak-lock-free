@@ -8,9 +8,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static java.lang.String.valueOf;
 
 /**
  * <p>
@@ -217,7 +214,6 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
      * WeakKey instances to function correctly, we are voluntarily breaking the Java API contract for
      * hashCode/equals of these instances.
      *
-     *
      * System hash codes are immutable and can therefore be computed prematurely and are stored explicitly
      * within the WeakKey instances. This way, we always know the correct hash code of a key and always
      * end up in the correct bucket of our target map. This remains true even after the weakly referenced
@@ -238,13 +234,17 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
      * explicitly, the reference queue eventually polls exactly as many weak keys as there are stale entries.
      *
      * Therefore, we can guarantee that there is no memory leak.
+     *
+     * It is the responsibility of the actual map implementation to implement a lookup key that is used for
+     * lookups. The lookup key must supply the same semantics as the weak key with regards to hash code.
+     * The weak key invokes the latent key's equality method upon evaluation.
      */
 
-    static class WeakKey<T> extends WeakReference<T> {
+    public static final class WeakKey<K> extends WeakReference<K> {
 
         private final int hashCode;
 
-        WeakKey(T key, ReferenceQueue<? super T> queue) {
+        WeakKey(K key, ReferenceQueue<? super K> queue) {
             super(key, queue);
             hashCode = System.identityHashCode(key);
         }
@@ -256,58 +256,16 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
 
         @Override
         public boolean equals(Object other) {
-            if (other instanceof LatentKey<?>) {
-                return ((LatentKey<?>) other).key == get();
-            } else {
+            if (other instanceof WeakKey<?>) {
                 return ((WeakKey<?>) other).get() == get();
+            } else {
+                return other.equals(this);
             }
         }
 
         @Override
         public String toString() {
-            return valueOf(get());
-        }
-    }
-
-    /*
-     * A latent key must only be used for looking up instances within a map. For this to work, it implements an identical contract for
-     * hash code and equals as the WeakKey implementation. At the same time, the latent key implementation does not extend WeakReference
-     * and avoids the overhead that a weak reference implies.
-     */
-
-    // can't use AutoClosable/try-with-resources as this project still supports Java 6
-    static class LatentKey<T> {
-
-        T key;
-
-        private int hashCode;
-
-        LatentKey<T> withValue(T key) {
-            this.key = key;
-            hashCode = System.identityHashCode(key);
-            return this;
-        }
-
-        /**
-         * Failing to reset a latent key can lead to memory leaks as the key is strongly referenced.
-         */
-        void reset() {
-            key = null;
-            hashCode = 0;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (other instanceof LatentKey<?>) {
-                return ((LatentKey<?>) other).key == key;
-            } else {
-                return ((WeakKey<?>) other).get() == key;
-            }
-        }
-
-        @Override
-        public int hashCode() {
-            return hashCode;
+            return String.valueOf(get());
         }
     }
 

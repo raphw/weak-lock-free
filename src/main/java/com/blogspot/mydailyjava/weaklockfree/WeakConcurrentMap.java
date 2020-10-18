@@ -1,7 +1,5 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
-import com.blogspot.mydailyjava.weaklockfree.AbstractWeakConcurrentMap.LatentKey;
-
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,17 +14,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * This class does not implement the {@link java.util.Map} interface because this implementation is incompatible
  * with the map contract. While iterating over a map's entries, any key that has not passed iteration is referenced non-weakly.
  */
-public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, LatentKey<K>>{
+public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, WeakConcurrentMap.LookupKey<K>> {
 
     /**
-     * Latent keys are cached thread-locally to avoid allocations on lookups.
-     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LatentKey} allocation
-     * with stack allocations, even though the {@link LatentKey} does not escape.
+     * Lookup keys are cached thread-locally to avoid allocations on lookups.
+     * This is beneficial as the JIT unfortunately can't reliably replace the {@link LookupKey} allocation
+     * with stack allocations, even though the {@link LookupKey} does not escape.
      */
-    private static final ThreadLocal<LatentKey<?>> LATENT_KEY_CACHE = new ThreadLocal<LatentKey<?>>() {
+    private static final ThreadLocal<LookupKey<?>> LOOKUP_KEY_CACHE = new ThreadLocal<LookupKey<?>>() {
         @Override
-        protected LatentKey<?> initialValue() {
-            return new LatentKey<Object>();
+        protected LookupKey<?> initialValue() {
+            return new LookupKey<Object>();
         }
     };
 
@@ -40,13 +38,13 @@ public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, Lat
      * @param cleanerThread {@code true} if a thread should be started that removes stale entries.
      */
     public WeakConcurrentMap(boolean cleanerThread) {
-        this(cleanerThread, isPersistentClassLoader(LatentKey.class.getClassLoader()));
+        this(cleanerThread, isPersistentClassLoader(LookupKey.class.getClassLoader()));
     }
 
     /**
      * Checks whether the provided {@link ClassLoader} may be unloaded like a web application class loader, for example.
      * <p>
-     * If the class loader can't be unloaded, it is safe to use {@link ThreadLocal}s and to reuse the {@link LatentKey}.
+     * If the class loader can't be unloaded, it is safe to use {@link ThreadLocal}s and to reuse the {@link LookupKey}.
      * Otherwise, the use of {@link ThreadLocal}s may lead to class loader leaks as it prevents the class loader this class
      * is loaded by to unload.
      * </p>
@@ -97,18 +95,18 @@ public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, Lat
 
     @Override
     @SuppressWarnings("unchecked")
-    protected LatentKey<K> getLookupKey(K key) {
-        LatentKey<K> latentKey;
+    protected LookupKey<K> getLookupKey(K key) {
+        LookupKey<K> lookupKey;
         if (reuseKeys) {
-            latentKey = (LatentKey<K>) LATENT_KEY_CACHE.get();
+            lookupKey = (LookupKey<K>) LOOKUP_KEY_CACHE.get();
         } else {
-            latentKey = new LatentKey<K>();
+            lookupKey = new LookupKey<K>();
         }
-        return latentKey.withValue(key);
+        return lookupKey.withValue(key);
     }
 
     @Override
-    protected void resetLookupKey(LatentKey<K> lookupKey) {
+    protected void resetLookupKey(LookupKey<K> lookupKey) {
         lookupKey.reset();
     }
 
@@ -117,6 +115,47 @@ public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, Lat
      */
     public Thread getCleanerThread() {
         return thread;
+    }
+
+    /*
+     * A lookup key must only be used for looking up instances within a map. For this to work, it implements an identical contract for
+     * hash code and equals as the WeakKey implementation. At the same time, the lookup key implementation does not extend WeakReference
+     * and avoids the overhead that a weak reference implies.
+     */
+
+    // can't use AutoClosable/try-with-resources as this project still supports Java 6
+    static final class LookupKey<K> {
+
+        private K key;
+        private int hashCode;
+
+        LookupKey<K> withValue(K key) {
+            this.key = key;
+            hashCode = System.identityHashCode(key);
+            return this;
+        }
+
+        /**
+         * Failing to reset a lookup key can lead to memory leaks as the key is strongly referenced.
+         */
+        void reset() {
+            key = null;
+            hashCode = 0;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (other instanceof WeakConcurrentMap.LookupKey<?>) {
+                return ((LookupKey<?>) other).key == key;
+            } else {
+                return ((WeakKey<?>) other).get() == key;
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return hashCode;
+        }
     }
 
     /**
