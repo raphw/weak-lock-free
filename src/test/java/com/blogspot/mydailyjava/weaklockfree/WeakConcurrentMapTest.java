@@ -1,5 +1,6 @@
 package com.blogspot.mydailyjava.weaklockfree;
 
+import java.lang.ref.WeakReference;
 import org.junit.Test;
 
 import java.util.*;
@@ -43,7 +44,44 @@ public class WeakConcurrentMapTest {
         assertThat(map.getCleanerThread().isAlive(), is(false));
     }
 
-    private class MapTestCase {
+    static class KeyEqualToWeakRefOfItself {
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof WeakReference<?>) {
+                return equals(((WeakReference<?>) obj).get());
+            }
+            return super.equals(obj);
+        }
+    }
+
+    static class CheapUnloadableWeakConcurrentMap extends AbstractWeakConcurrentMap<KeyEqualToWeakRefOfItself, Object, Object> {
+
+
+        @Override
+        protected Object getLookupKey(KeyEqualToWeakRefOfItself key) {
+            return key;
+        }
+
+        @Override
+        protected void resetLookupKey(Object lookupKey) { }
+    }
+
+    @Test
+    public void testKeyWithWeakRefEquals() {
+        CheapUnloadableWeakConcurrentMap map = new CheapUnloadableWeakConcurrentMap();
+
+        KeyEqualToWeakRefOfItself key = new KeyEqualToWeakRefOfItself();
+        Object value = new Object();
+        map.put(key, value);
+        assertThat(map.containsKey(key), is(true));
+        assertThat(map.get(key), is(value));
+        assertThat(map.putIfAbsent(key, new Object()), is(value));
+        assertThat(map.remove(key), is(value));
+        assertThat(map.containsKey(key), is(false));
+    }
+
+    private static class MapTestCase {
 
         private final WeakConcurrentMap<Object, Object> map;
 
@@ -97,7 +135,6 @@ public class WeakConcurrentMapTest {
             assertThat(map.iterator().hasNext(), is(false));
         }
 
-        protected void triggerClean() {
-        }
+        protected void triggerClean() { }
     }
 }
