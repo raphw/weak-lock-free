@@ -167,12 +167,35 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
     }
 
     /**
+     * Removes the value corresponding to the already garbage collected {@link Reference}. This
+     * should generally only be used if overriding {@link #expungeStaleEntries()} to execute code
+     * when references have been collected.
+     *
+     * <pre>{@code
+     *
+     * class MyReferenceListener<K, V> extends WeakConcurrentMap.WithInlinedExpunction<K, V> {     *
+     *   public void expungeStaleEntries() {
+     *     Reference<?> reference;
+     *     while ((reference = poll()) != null) {
+     *       V value = expungeStaleEntry(reference);
+     *       if (value != null) {
+     *         reportOrphanedReference(value);
+     *       }
+     *     }
+     *   }
+     * }</pre>
+     */
+    protected final V expungeStaleEntry(Reference<?> reference) {
+        return target.remove(reference);
+    }
+
+    /**
      * Cleans all unused references.
      */
     public void expungeStaleEntries() {
         Reference<?> reference;
         while ((reference = poll()) != null) {
-            target.remove(reference);
+            expungeStaleEntry(reference);
         }
     }
 
@@ -189,7 +212,7 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
     public void run() {
         try {
             while (!Thread.interrupted()) {
-                target.remove(remove());
+                expungeStaleEntry(remove());
             }
         } catch (InterruptedException ignored) {
             // do nothing
