@@ -171,9 +171,8 @@ public abstract class AbstractWeakConcurrentMap<K, V, L> extends ReferenceQueue<
      * should generally only be used if overriding {@link #expungeStaleEntries()} to execute code
      * when references have been collected.
      *
-     * <pre>{@code
-     *
-     * class MyReferenceListener<K, V> extends WeakConcurrentMap.WithInlinedExpunction<K, V> {     *
+     * <pre>{@code     *
+     * class MyReferenceListener<K, V> extends WeakConcurrentMap.WithInlinedExpunction<K, V> {
      *   public void expungeStaleEntries() {
      *     Reference<?> reference;
      *     while ((reference = poll()) != null) {
