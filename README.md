@@ -6,7 +6,7 @@ This is a miniature implementation of a concurrent, lock-free (as in lock-less) 
 
 As a wrapper around this `WeakConcurrentMap`, this package also contains a `DetachedThreadLocal` which describes a weak concurrent map where the current thread serves as a key of the map. Also, this package delivers a `WeakConcurrentSet` as a wrapper around a weak concurrent map.
 
-This map does not implement the `java.util.Map` interface to simplify the implementation. Writes to the map might cause blocking if many threads write to the map concurrently (this is implied by the maps backing by a `ConcurrentHashMap` and a `ReferenceQueue`), the performance of the map is however significantly better than using a synchronized wrapper around a concurrent hash map.
+This map does not implement the `java.util.Map` interface to simplify the implementation. Writes to the map might cause blocking if many threads write to the map concurrently (this is implied by the maps backing by a `ConcurrentHashMap` and a `ReferenceQueue`), the performance of the map is however significantly better than using a synchronized wrapper around a weak hash map.
 
 The library is hosted on *Maven Central* and *JCenter*:
 
