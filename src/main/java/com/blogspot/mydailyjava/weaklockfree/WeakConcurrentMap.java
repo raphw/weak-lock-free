@@ -52,7 +52,7 @@ public class WeakConcurrentMap<K, V> extends AbstractWeakConcurrentMap<K, V, Wea
      * @param classLoader The class loader to check.
      * @return {@code true} if the provided class loader can be unloaded.
      */
-    private static boolean isPersistentClassLoader(ClassLoader classLoader) {
+    protected static boolean isPersistentClassLoader(ClassLoader classLoader) {
         try {
             return classLoader == null // bootstrap class loader
                     || classLoader == ClassLoader.getSystemClassLoader()
